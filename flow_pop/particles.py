@@ -17,7 +17,7 @@ class Simulation_2d(object):
         self.num_particles = num_particles
         self.num_populations = num_populations
 
-        self.num_bins = self.L/interaction_length
+        self.num_bins = np.int32(self.L/interaction_length)
 
         # Create particles randomly for now
         starting_num = num_particles / num_populations
@@ -51,7 +51,7 @@ class Simulation_2d(object):
 class Particle(object):
     def __init__(self, simulation, pop_type, position, grid_point, D=1.0):
 
-        self.sim = weakref.ref(simulation)
+        self.sim = weakref.proxy(simulation)
 
         self.pop_type = np.int32(pop_type)
         self.position = np.float32(position)
