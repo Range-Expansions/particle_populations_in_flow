@@ -1,4 +1,6 @@
 import numpy as np
+import weakref
+
 
 class Simulation_2d(object):
 
@@ -17,49 +19,77 @@ class Simulation_2d(object):
 
         self.num_bins = self.L/interaction_length
 
+        # Create particles randomly for now
         starting_num = num_particles / num_populations
 
-    class Particle(object):
-        def __init__(self, simulation, pop_type, position, grid_point, D=1.0):
+        self.particle_list = []
+        for cur_pop in range(num_populations):
+            for i in range(starting_num):
+                cur_position = np.random.rand(2) * self.L
 
-            self.simulation = simulation
+                cur_grid = np.int32(cur_position / interaction_length)
 
-            self.pop_type = np.int32(pop_type)
-            self.position = np.float32(position)
-            self.grid_point = np.int32(grid_point)
+                new_particle = Particle(self, cur_pop, cur_position, cur_grid)
 
-            self.D = D
+                self.particle_list.append(new_particle)
 
-        def move(self):
+        # Setup the grid
+        self.grid = np.zeros((self.num_bins[0], self.num_bins[1], self.num_populations), dtype=np.int32)
+        for cur_particle in self.particle_list:
+            xy = cur_particle.grid_point
+            pop_num = cur_particle.pop_type
 
-            grid[self.grid_point[0], self.grid_point[1], self.pop_type] -= 1
+            self.grid[xy[0], xy[1], pop_num] += 1
 
-            self.position += np.sqrt(2 * self.D * dt) * np.random.randn(2)
+    def run(self, num_iterations):
+        for i in range(num_iterations):
+            # Move
+            for cur_particle in self.particle_list:
+                cur_particle.move()
 
-            # Deal with moving out of the system...bounce back
-            Lx = L[0]
-            Ly = L[1]
 
-            x = self.position[0]
-            y = self.position[1]
+class Particle(object):
+    def __init__(self, simulation, pop_type, position, grid_point, D=1.0):
 
-            dx = 0
+        self.sim = weakref.ref(simulation)
 
-            if (x < 0):
-                x = np.abs(x)
-            if (x > Lx):
-                x = Lx - (x - Lx)
+        self.pop_type = np.int32(pop_type)
+        self.position = np.float32(position)
+        self.grid_point = np.int32(grid_point)
 
-            if (y < 0):
-                y = np.abs(y)
-            if (y > Ly):
-                y = Ly - (y - Ly)
+        self.D = D
 
-            self.position[0] = x
-            self.position[1] = y
+    def move(self):
 
-            self.grid_point = np.int32(self.position / interaction_length)
+        sim = self.sim
 
-            grid[self.grid_point[0], self.grid_point[1], self.pop_type] += 1
+        sim.grid[self.grid_point[0], self.grid_point[1], self.pop_type] -= 1
 
-        def react(self):
+        self.position += np.sqrt(2 * self.D * sim.dt) * np.random.randn(2)
+
+        # Deal with moving out of the system...bounce back
+        Lx = sim.L[0]
+        Ly = sim.L[1]
+
+        x = self.position[0]
+        y = self.position[1]
+
+        if (x < 0):
+            x = np.abs(x)
+        if (x > Lx):
+            x = Lx - (x - Lx)
+
+        if (y < 0):
+            y = np.abs(y)
+        if (y > Ly):
+            y = Ly - (y - Ly)
+
+        self.position[0] = x
+        self.position[1] = y
+
+        self.grid_point = np.int32(self.position / sim.interaction_length)
+
+        sim.grid[self.grid_point[0], self.grid_point[1], self.pop_type] += 1
+
+    def react(self):
+        pass
