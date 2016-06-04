@@ -45,6 +45,8 @@ class Simulation_2d(object):
         """Right now, simple concentration-based growth"""
 
         particles_to_keep = []
+        positions_to_increase = []
+        positions_to_decrease = []
 
         for cur_particle in self.particle_list:
             x = cur_particle.grid_point[0]
@@ -58,11 +60,11 @@ class Simulation_2d(object):
                 rand = np.random.rand()
 
                 if rand < prob: # React!
-                    particles_to_keep.append(cur_particle)
-
                     new_particle = cur_particle.birth()
-                    # Keep the old particle
                     particles_to_keep.append(new_particle)
+                    positions_to_increase.append([x, y, new_particle.pop_type])
+
+                particles_to_keep.append(cur_particle)
 
             elif cur_particle.pop_type == self.num_populations - 1:
 
@@ -72,12 +74,17 @@ class Simulation_2d(object):
                     rand = np.random.rand()
 
                     if rand < prob: # Die
-                        pass
+                        positions_to_decrease.append([x, y, cur_particle.pop_type])
                     else: # Keep the particle around
                         particles_to_keep.append(cur_particle)
 
         # Appropriately add and delete particles to the simulation after the loop
         self.particle_list = particles_to_keep
+        # Update the grid
+        for xyc in positions_to_increase:
+            self.grid[xyc[0], xyc[1], xyc[2]] += 1
+        for xyc in positions_to_decrease:
+            self.grid[xyc[0], xyc[1], xyc[2]] -= 1
 
     def move(self):
         for cur_particle in self.particle_list:
