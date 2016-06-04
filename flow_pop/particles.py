@@ -50,9 +50,9 @@ class Simulation_2d(object):
             x = cur_particle.grid_point[0]
             y = cur_particle.grid_point[1]
 
-            if cur_particle.pop_type != self.num_populations: # Last type is the concentration field
+            if cur_particle.pop_type != self.num_populations - 1: # Last type is the concentration field
 
-                num_c = self.grid[x, y, self.num_populations]
+                num_c = self.grid[x, y, self.num_populations - 1]
 
                 prob = num_c * cur_particle.k * self.dt
                 rand = np.random.rand()
@@ -64,7 +64,7 @@ class Simulation_2d(object):
                     # Keep the old particle
                     particles_to_keep.append(new_particle)
 
-            elif cur_particle.pop_type == self.num_populations:
+            elif cur_particle.pop_type == self.num_populations - 1:
 
                 for i in range(self.num_populations - 1): # Loop over all possible 2-pair interactions
                     cur_n = self.grid[x, y, i]
@@ -91,7 +91,7 @@ class Simulation_2d(object):
 class Particle(object):
     def __init__(self, simulation, pop_type, position, grid_point, D=1.0, k = 1.0):
 
-        self.sim = weakref.proxy(simulation)
+        self.sim = simulation
 
         self.pop_type = np.int32(pop_type)
         self.position = np.float32(position)
