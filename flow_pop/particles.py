@@ -1,6 +1,7 @@
 import numpy as np
 import weakref
 
+zero_cutoff = 10.**-12
 
 class Simulation_2d(object):
 
@@ -142,9 +143,14 @@ class Particle(object):
 
         sim.grid[self.grid_point[0], self.grid_point[1], self.pop_type] -= 1
 
-        self.position += np.sqrt(2 * self.D * sim.dt) * np.random.randn(2)
+
+        rand2 = np.random.randn(2)
+
+        self.position += np.sqrt(2 * self.D * sim.dt) * rand2
 
         # Deal with moving out of the system...bounce back
+        # The issue with bounceback is that if you move farther that the system size twice,
+        # due to the randn draw, you can run into trouble...
         Lx = sim.L[0]
         Ly = sim.L[1]
 
@@ -153,18 +159,29 @@ class Particle(object):
 
         if (x < 0):
             x = np.abs(x)
-        if (x > Lx):
-            x = Lx - (x - Lx)
+        elif (x > Lx):
+            dx = x - Lx
+            x = Lx - dx
 
         if (y < 0):
             y = np.abs(y)
-        if (y > Ly):
-            y = Ly - (y - Ly)
+        elif (y > Ly):
+            dy = y - Ly
+            y = Ly - dy
 
         self.position[0] = x
         self.position[1] = y
 
         self.grid_point = np.int32(self.position / sim.interaction_length)
+
+        xout = (self.grid_point[0] < 0) or (self.grid_point[0] > self.sim.num_bins[0] - 1)
+        yout = (self.grid_point[1] < 0) or (self.grid_point[1] > self.sim.num_bins[1] - 1)
+
+        if xout or yout:
+            print 'out of bounds, wtf'
+            print self.position
+            print rand2
+            print
 
         sim.grid[self.grid_point[0], self.grid_point[1], self.pop_type] += 1
 
