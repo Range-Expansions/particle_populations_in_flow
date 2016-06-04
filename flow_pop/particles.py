@@ -44,28 +44,49 @@ class Simulation_2d(object):
     def react(self):
         """Right now, simple concentration-based growth"""
 
+        particles_to_keep = []
+
         for cur_particle in self.particle_list:
+            x = cur_particle.grid_point[0]
+            y = cur_particle.grid_point[1]
+
             if cur_particle.pop_type != self.num_populations: # Last type is the concentration field
-                x = cur_particle.grid_point[0]
-                y = cur_particle.grid_point[1]
 
                 num_c = self.grid[x, y, self.num_populations]
-                rand = np.random.rand()
 
                 prob = num_c * cur_particle.k * self.dt
+                rand = np.random.rand()
 
-                if rand < prob: # react...the issue is that we actually need the ID of each particle...
-                    # We need to store, *in the grid*, particles, actually. Not the number. Bleh.
-                    pass
+                if rand < prob: # React!
+                    particles_to_keep.append(cur_particle)
 
+                    new_particle = cur_particle.birth()
+                    # Keep the old particle
+                    particles_to_keep.append(new_particle)
 
+            elif cur_particle.pop_type == self.num_populations:
+
+                for i in range(self.num_populations - 1): # Loop over all possible 2-pair interactions
+                    cur_n = self.grid[x, y, i]
+                    prob = cur_n * cur_particle.k * self.dt
+                    rand = np.random.rand()
+
+                    if rand < prob: # Die
+                        pass
+                    else: # Keep the particle around
+                        particles_to_keep.append(cur_particle)
+
+        # Appropriately add and delete particles to the simulation after the loop
+        self.particle_list = particles_to_keep
+
+    def move(self):
+        for cur_particle in self.particle_list:
+            cur_particle.move()
 
     def run(self, num_iterations):
         for i in range(num_iterations):
-            # Move
-            for cur_particle in self.particle_list:
-                cur_particle.move()
-
+            self.move()
+            self.react()
 
 class Particle(object):
     def __init__(self, simulation, pop_type, position, grid_point, D=1.0, k = 1.0):
@@ -110,3 +131,7 @@ class Particle(object):
         self.grid_point = np.int32(self.position / sim.interaction_length)
 
         sim.grid[self.grid_point[0], self.grid_point[1], self.pop_type] += 1
+
+    def birth(self):
+        return Particle(self.sim, self.pop_type, self.position, self.grid_point,
+                        D=self.D, k=self.k)
