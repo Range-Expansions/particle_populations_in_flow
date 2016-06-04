@@ -41,6 +41,24 @@ class Simulation_2d(object):
 
             self.grid[xy[0], xy[1], pop_num] += 1
 
+    def react(self):
+        """Right now, simple concentration-based growth"""
+
+        for cur_particle in self.particle_list:
+            if cur_particle.pop_type != self.num_populations: # Last type is the concentration field
+                x = cur_particle.grid_point[0]
+                y = cur_particle.grid_point[1]
+
+                num_c = self.grid[x, y, self.num_populations]
+                rand = np.random.rand()
+
+                prob = num_c * cur_particle.k * self.dt
+
+                if rand < prob: # react...the issue is that we actually need the ID of each particle...
+                    pass
+
+
+
     def run(self, num_iterations):
         for i in range(num_iterations):
             # Move
@@ -49,7 +67,7 @@ class Simulation_2d(object):
 
 
 class Particle(object):
-    def __init__(self, simulation, pop_type, position, grid_point, D=1.0):
+    def __init__(self, simulation, pop_type, position, grid_point, D=1.0, k = 1.0):
 
         self.sim = weakref.proxy(simulation)
 
@@ -58,6 +76,7 @@ class Particle(object):
         self.grid_point = np.int32(grid_point)
 
         self.D = D
+        self.k = k
 
     def move(self):
 
@@ -90,6 +109,3 @@ class Particle(object):
         self.grid_point = np.int32(self.position / sim.interaction_length)
 
         sim.grid[self.grid_point[0], self.grid_point[1], self.pop_type] += 1
-
-    def react(self):
-        pass
