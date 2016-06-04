@@ -1,7 +1,7 @@
 import numpy as np
 import weakref
 
-zero_cutoff = 10.**-12
+tolerance = 10.**-9.
 
 class Simulation_2d(object):
 
@@ -158,29 +158,34 @@ class Particle(object):
         y = self.position[1]
 
         if (x < 0):
-            x = np.abs(x)
+            dx = (-x) % Lx
+            x = dx + tolerance
         elif (x > Lx):
-            dx = x - Lx
-            x = Lx - dx
-
+            dx = (x - Lx) % Lx # Just to avoid super bounces
+            x = Lx - dx - tolerance
         if (y < 0):
-            y = np.abs(y)
+            dy = (-y) % Ly
+            y = dy + tolerance
         elif (y > Ly):
-            dy = y - Ly
-            y = Ly - dy
+            dy = (y - Ly) % Ly  # Just to avoid super bounces
+            y = Ly - dy - tolerance
 
         self.position[0] = x
         self.position[1] = y
 
-        self.grid_point = np.int32(self.position / sim.interaction_length)
+        gridx = np.int32(x / sim.interaction_length)
+        gridy = np.int32(y / sim.interaction_length)
+
+        self.grid_point[0] = gridx
+        self.grid_point[1] = gridy
 
         xout = (self.grid_point[0] < 0) or (self.grid_point[0] > self.sim.num_bins[0] - 1)
         yout = (self.grid_point[1] < 0) or (self.grid_point[1] > self.sim.num_bins[1] - 1)
 
         if xout or yout:
             print 'out of bounds, wtf'
-            print self.position
-            print rand2
+            print 'position:', self.position
+            print 'random:', rand2
             print
 
         sim.grid[self.grid_point[0], self.grid_point[1], self.pop_type] += 1
