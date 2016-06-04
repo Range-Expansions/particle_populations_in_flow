@@ -55,6 +55,7 @@ class Simulation_2d(object):
                 prob = num_c * cur_particle.k * self.dt
 
                 if rand < prob: # react...the issue is that we actually need the ID of each particle...
+                    # We need to store, *in the grid*, particles, actually. Not the number. Bleh.
                     pass
 
 
