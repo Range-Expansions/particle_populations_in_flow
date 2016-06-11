@@ -7,13 +7,12 @@ class Simulation_2d(object):
 
     def __init__(self, Lx=1., Ly=1., interaction_length=0.02, num_particles=300,
                  num_nutrients = 10**4,
-                 num_populations = 2, dt = 0.1, D=1.0):
+                 num_populations = 2, dt = 0.1):
 
         self.Lx = Lx
         self.Ly = Ly
         self.L = np.array([Lx, Ly])
         self.dt = dt
-        self.D = D
 
         self.interaction_length = interaction_length
 
@@ -22,94 +21,42 @@ class Simulation_2d(object):
 
         self.num_populations = num_populations
         self.num_fields = num_populations + 1 # We need the concentration field
-        self.nutrient_id = self.num_populations
 
         self.num_bins = np.int32(self.L/interaction_length)
 
         # Create particles randomly for now
         starting_num = num_particles / num_populations
 
-        positions = []
-        pop_types = []
-
-        # Inoculate individuals randomly for now
+        self.particle_dict = {}
         for cur_pop in range(self.num_populations):
             for i in range(starting_num):
+                particle_id = cur_pop*starting_num + i
                 cur_position = np.random.rand(2) * self.L
 
-                positions.append(cur_position)
-                pop_types.append(cur_pop)
+                cur_grid = np.int32(cur_position / interaction_length)
+
+                new_particle = Particle(self, cur_pop, cur_position, cur_grid)
+
+                self.particle_dict[particle_id] = new_particle
 
         # Create nutrients randomly for now as well...
         for i in range(num_nutrients):
+            particle_id = self.num_populations * starting_num + i
             cur_position = np.random.rand(2) * self.L
 
-            positions.append(cur_position)
-            pop_types.append(self.nutrient_id)
+            cur_grid = np.int32(cur_position / interaction_length)
 
-        self.positions = np.array(positions, dtype=np.float32, order='F')
-        self.pop_types = np.array(pop_types, dtype=np.float32, order='F')
+            new_particle = Particle(self, self.num_populations, cur_position, cur_grid)
 
-        # Setup the grid...still must be a for loop
+            self.particle_dict[particle_id] = new_particle
+
+        # Setup the grid
         self.grid = np.zeros((self.num_bins[0], self.num_bins[1], self.num_fields), dtype=np.int32)
+        for cur_particle in self.particle_dict.values():
+            xy = cur_particle.grid_point
+            pop_num = cur_particle.pop_type
 
-        self.grid_positions = np.int32(self.positions/self.interaction_length)
-
-        for xy, id in zip(self.grid_positions, self.pop_types):
-            self.grid[xy[0], xy[1], id] += 1
-
-    def move(self):
-
-        for xy, id in zip(self.grid_positions, self.pop_types):
-            self.grid[xy[0], xy[1], id] -= 1
-
-        num_current_particles = self.positions.shape[0]
-        self.positions += np.sqrt(2 * self.D * self.dt) * np.random.randn(num_current_particles, 2)
-
-        # Deal with moving out of the system...bounce back
-        # The issue with bounceback is that if you move farther that the system size twice,
-        # due to the randn draw, you can run into trouble...
-        Lx = self.L[0]
-        Ly = self.L[1]
-
-        lt0 = self.positions < 0
-        self.positions[lt0] = -1 * self.positions[lt0] + tolerance
-
-        x = self.position[0]
-        y = self.position[1]
-
-        if (x < 0):
-            dx = (-x) % Lx
-            x = dx + tolerance
-        elif (x > Lx):
-            dx = (x - Lx) % Lx # Just to avoid super bounces
-            x = Lx - dx - tolerance
-        if (y < 0):
-            dy = (-y) % Ly
-            y = dy + tolerance
-        elif (y > Ly):
-            dy = (y - Ly) % Ly  # Just to avoid super bounces
-            y = Ly - dy - tolerance
-
-        self.position[0] = x
-        self.position[1] = y
-
-        gridx = np.int32(x / sim.interaction_length)
-        gridy = np.int32(y / sim.interaction_length)
-
-        self.grid_point[0] = gridx
-        self.grid_point[1] = gridy
-
-        xout = (self.grid_point[0] < 0) or (self.grid_point[0] > self.sim.num_bins[0] - 1)
-        yout = (self.grid_point[1] < 0) or (self.grid_point[1] > self.sim.num_bins[1] - 1)
-
-        if xout or yout:
-            print 'out of bounds, wtf'
-            print 'position:', self.position
-            print 'random:', rand2
-            print
-
-        sim.grid[self.grid_point[0], self.grid_point[1], self.pop_type] += 1
+            self.grid[xy[0], xy[1], pop_num] += 1
 
     def react(self):
         """Right now, simple concentration-based growth"""
