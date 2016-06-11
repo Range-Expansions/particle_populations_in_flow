@@ -1,7 +1,7 @@
 import numpy as np
-import weakref
+cimport numpy as np
 
-tolerance = 10.**-9.
+cdef float tolerance = 10.**-9.
 
 class Simulation_2d(object):
 
