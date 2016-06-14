@@ -58,15 +58,15 @@ class Simulation_2d(object):
 
             self.grid[xy[0], xy[1], pop_num] += 1
 
+        self.total_growth_grid = np.zeros((self.num_bins[0], self.num_bins[1]), dtype=np.int32)
+
     def react(self):
         """Right now, simple concentration-based growth"""
 
+        ##### REACT POPULATION PARTICLES ####
 
         particles_to_add = []
         positions_to_increase = []
-
-        keys_to_delete = []
-        positions_to_decrease = []
 
         concentration_index = self.num_fields - 1
 
@@ -86,35 +86,49 @@ class Simulation_2d(object):
                     new_particle = cur_particle.birth()
                     particles_to_add.append(new_particle)
                     positions_to_increase.append([x, y, new_particle.pop_type])
+                    self.total_growth_grid[x, y] += 1
 
-            else:
-                total_n = 0
-                for i in range(self.num_populations): # Loop over all possible 2-pair interactions
-                    total_n += self.grid[x, y, i]
+        #### ADJUST THE NUTRIENT FIELD APPROPRIATELY ####
 
-                prob = total_n * cur_particle.k * self.dt
-                rand = np.random.rand()
+        keys_to_delete = []
+        positions_to_decrease = []
 
-                if rand < prob: # Die
+        # Adjust the nutrient field appropriately, based on the growth of the others
+        for cur_key in self.particle_dict:
+            cur_particle = self.particle_dict[cur_key]
+            x = cur_particle.grid_point[0]
+            y = cur_particle.grid_point[1]
+
+            if cur_particle.pop_type == concentration_index: # Last type is the concentration field
+
+                if self.total_growth_grid[x, y] > 0:
                     positions_to_decrease.append([x, y, cur_particle.pop_type])
                     keys_to_delete.append(cur_key)
+                    self.total_growth_grid[x, y] -= 1
 
-        # Delete dead particles
+        #### UPDATE THE GRIDS AND PARTICLE DICTIONARY ####
+
+        # Remove particles that died (nutrients)
         for cur_key in keys_to_delete:
             del self.particle_dict[cur_key]
 
-        # Add new particles to the dictionary
+        # Add new particles to the dictionary that were born
         max_key = np.max(self.particle_dict.keys())
         count = 1
         for cur_particle in particles_to_add:
             self.particle_dict[max_key + count] = cur_particle
             count += 1
 
-        # Update the grid
+        # Update the grid based on populations
         for xyc in positions_to_increase:
             self.grid[xyc[0], xyc[1], xyc[2]] += 1
         for xyc in positions_to_decrease:
             self.grid[xyc[0], xyc[1], xyc[2]] -= 1
+
+        # Reset the growth grid
+        self.total_growth_grid[:, :] = 0
+
+
 
     def move(self):
         for cur_particle in self.particle_dict.values():
