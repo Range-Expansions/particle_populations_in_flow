@@ -7,11 +7,23 @@ class Simulation_2d(object):
 
     def __init__(self, Lx=1., Ly=1., interaction_length=0.02, num_particles=300,
                  num_nutrients = 10**4,
+                 mu_c = 1.0, mu_list = None,
+                 Dc = 1.0, D_list = None,
                  num_populations = 2, dt = 0.1):
 
-        self.Lx = Lx
-        self.Ly = Ly
-        self.L = np.array([Lx, Ly])
+        self.phys_Lx = Lx
+        self.phys_Ly = Ly
+
+        self.phys_muc = mu_c
+        self.phys_mu_list = mu_list
+        self.phys_Dc = Dc
+        self.phys_D_list = D_list
+
+        #### DEFINE CHARACTERISTIC LENGTH AND TIME SCALES ####
+        self.Lc = 2*np.sqrt(self.phys_Dc/self.phys_muc)
+        self.Tc = 1./self.phys_muc
+
+
         self.dt = dt
 
         self.interaction_length = interaction_length
