@@ -1,42 +1,93 @@
 import numpy as np
-import weakref
 
 tolerance = 10.**-9.
 
 class Simulation_2d(object):
 
     def __init__(self, Lx=1., Ly=1., interaction_length=0.02, num_particles=300,
-                 num_nutrients = 10**4,
+                 N = 10., R = 4., time_prefactor = 0.1,
                  mu_c = 1.0, mu_list = None,
                  Dc = 1.0, D_list = None,
+                 D_nutrient = 1.0,
                  num_populations = 2, dt = 0.1):
 
         self.phys_Lx = Lx
         self.phys_Ly = Ly
 
-        self.phys_muc = mu_c
-        self.phys_mu_list = mu_list
-        self.phys_Dc = Dc
-        self.phys_D_list = D_list
+        self.N = N # Number of particles per unit area
+        self.R = R # Resolution: Number of interaction lengths a deme of size Lc is divided into
+        self.time_prefactor = time_prefactor
 
-        #### DEFINE CHARACTERISTIC LENGTH AND TIME SCALES ####
+        self.phys_muc = mu_c
+        self.phys_mu_list = np.array(mu_list, dtype=np.float32)
+        self.phys_Dc = Dc
+        self.phys_D_list = np.array(D_list, dtype=np.float32)
+
+        self.phys_D_nutrient = D_nutrient
+
+        #### Define Characteristic Length and Time Scales ####
         self.Lc = 2*np.sqrt(self.phys_Dc/self.phys_muc)
         self.Tc = 1./self.phys_muc
 
+        #### Define Dimensionless Parameters ####
+        self.dim_Di_list = self.phys_D_list/(4*self.phys_Dc)
+        print 'dim_Di:', self.dim_Di_list
 
-        self.dt = dt
+        self.dim_D_nutrient = self.phys_D_nutrient/(4*self.phys_Dc)
+        print 'dim_D_nutrient:', self.dim_D_nutrient
 
-        self.interaction_length = interaction_length
+        self.dim_Gi_list = self.phys_mu_list/self.phys_muc
+        print 'dim_Gi:', self.dim_Gi_list
 
-        self.num_particles = num_particles
-        self.num_nutrients = num_nutrients
+        self.dim_Dgi_list = self.dim_Gi_list/(self.N*self.Lc**2) # Two-dimensional
+        print 'dim_Dgi:', self.dim_Dgi_list
 
-        self.num_populations = num_populations
+        #### Define Simulation Parameters ####
+        self.phys_delta = self.Lc/self.R # The interaction length. R should be larger than or equal to 1, always.
+        self.dim_delta = self.phys_delta / self.Lc
+
+        self.N_delta = self.N * self.phys_delta**2 # Average number of particles inside the interaction radius
+        self.N_L = self.N * self.Lc**2 # Average number of particles inside a deme. Controls stochasticity.
+
+        self.micro_Gi_list = self.dim_Gi_list / self.N_delta # The microscopic reaction rates. Dimensionless.
+        print 'Microscopic Gi:', self.micro_Gi_list
+        self.dim_dt = time_prefactor * (1./np.max(self.micro_Gi_list))
+        self.dim_dx = 1./self.R # The reaction radius spacing in dimensionless units
+        print 'Time step (to resolve microscopic reaction rates):', self.dt
+
+        ##### Initialize Particles and Grid #####
+        self.dim_Lx = self.phys_Lx / self.Lc
+        self.dim_Ly = self.phys_Ly / self.Lc
+
+        self.dim_L_array = np.array(self.dim_Lx, self.dim_Ly)
+
+        self.num_populations = len(self.phys_mu_list)
+        self.nutrient_id = self.num_populations # The ID corresponding to the nutrient field
+
         self.num_fields = num_populations + 1 # We need the concentration field
 
-        self.num_bins = np.int32(self.L/interaction_length)
+        self.num_bins = np.int32(self.phys_Lx/self.phys_delta)
 
-        # Create particles randomly for now
+        # Inoculate nutrient particles first. N particles per deme, roughly. The carrying capacity, basically.
+        total_num_nutrients = self.N * self.phys_Lx * self.phys_Ly
+
+        particle_id_num = 0
+
+        for i in range(total_num_nutrients):
+            # Scatter randomly in space throughout the system. Positions are stored in NON-DIMENSIONAL SPACE
+            particle_id = particle_id_num
+            cur_position = np.random.rand(2) * self.dim_L_array
+
+            cur_grid = np.int32(cur_position / self.dim_delta)
+
+            new_particle = Particle(self, self.nutrient_id, cur_position, cur_grid,
+                                    D=self.dim_D_nutrient, k=0) # k is zero as nutrient decay is correleated with other growth
+
+            self.particle_dict[particle_id] = new_particle
+
+            particle_id_num += 1
+
+
         starting_num = num_particles / num_populations
 
         self.particle_dict = {}
@@ -51,16 +102,7 @@ class Simulation_2d(object):
 
                 self.particle_dict[particle_id] = new_particle
 
-        # Create nutrients randomly for now as well...
-        for i in range(num_nutrients):
-            particle_id = self.num_populations * starting_num + i
-            cur_position = np.random.rand(2) * self.L
 
-            cur_grid = np.int32(cur_position / interaction_length)
-
-            new_particle = Particle(self, self.num_populations, cur_position, cur_grid)
-
-            self.particle_dict[particle_id] = new_particle
 
         # Setup the grid
         self.grid = np.zeros((self.num_bins[0], self.num_bins[1], self.num_fields), dtype=np.int32)
