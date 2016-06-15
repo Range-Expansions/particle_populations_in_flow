@@ -68,6 +68,7 @@ class Simulation_2d(object):
 
         self.num_bins = np.int32(self.phys_Lx/self.phys_delta)
 
+        #### Inoculate Nutrients ####
         # Inoculate nutrient particles first. N particles per deme, roughly. The carrying capacity, basically.
         total_num_nutrients = self.N * self.phys_Lx * self.phys_Ly
 
@@ -87,6 +88,8 @@ class Simulation_2d(object):
 
             particle_id_num += 1
 
+
+        #### Inoculate Populations ####
 
         starting_num = num_particles / num_populations
 
