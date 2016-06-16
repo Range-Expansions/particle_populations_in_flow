@@ -6,6 +6,7 @@ class Simulation_2d(object):
 
     def __init__(self, Lx=1., Ly=1., z = .1,
                  N = 10., R = 4., time_prefactor = 0.1,
+                 droplet_density=1.0,
                  mu_c = 1.0, mu_list = None,
                  Dc = 1.0, D_list = None,
                  D_nutrient = 1.0):
@@ -15,6 +16,7 @@ class Simulation_2d(object):
         self.phys_z = z
 
         self.N = N # Number of particles per unit area
+        self.droplet_density = droplet_density # Number of particles per unit area in the droplet
         self.R = R # Resolution: Number of interaction lengths a deme of size Lc is divided into
         self.time_prefactor = time_prefactor
 
@@ -27,7 +29,9 @@ class Simulation_2d(object):
 
         #### Define Characteristic Length and Time Scales ####
         self.Lc = 2*np.sqrt(self.phys_Dc/self.phys_muc)
+        print 'Lc (effective deme size, physical units):', self.Lc
         self.Tc = 1./self.phys_muc
+        print 'Tc (characteristic time scale, physical units):', self.Tc
 
         #### Define Dimensionless Parameters ####
         self.dim_Di_list = self.phys_D_list/(4*self.phys_Dc)
@@ -100,7 +104,7 @@ class Simulation_2d(object):
         # over a specified range
 
         # Inoculate a density of N particles all over the circle...
-        total_num_population = np.int32(self.N * np.pi*self.phys_z**2)
+        total_num_population = np.int32(self.droplet_density * np.pi*self.phys_z**2)
 
         print 'Number of particles in initial droplet:', total_num_population
 
