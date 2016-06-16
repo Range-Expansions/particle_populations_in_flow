@@ -4,15 +4,15 @@ tolerance = 10.**-9.
 
 class Simulation_2d(object):
 
-    def __init__(self, Lx=1., Ly=1., interaction_length=0.02, num_particles=300,
+    def __init__(self, Lx=1., Ly=1., z = .1,
                  N = 10., R = 4., time_prefactor = 0.1,
                  mu_c = 1.0, mu_list = None,
                  Dc = 1.0, D_list = None,
-                 D_nutrient = 1.0,
-                 num_populations = 2, dt = 0.1):
+                 D_nutrient = 1.0):
 
         self.phys_Lx = Lx
         self.phys_Ly = Ly
+        self.phys_z = z
 
         self.N = N # Number of particles per unit area
         self.R = R # Resolution: Number of interaction lengths a deme of size Lc is divided into
@@ -53,7 +53,7 @@ class Simulation_2d(object):
         print 'Microscopic Gi:', self.micro_Gi_list
         self.dim_dt = time_prefactor * (1./np.max(self.micro_Gi_list))
         self.dim_dx = 1./self.R # The reaction radius spacing in dimensionless units
-        print 'Time step (to resolve microscopic reaction rates):', self.dt
+        print 'Time step (to resolve microscopic reaction rates):', self.dim_dt
 
         ##### Initialize Particles and Grid #####
         self.dim_Lx = self.phys_Lx / self.Lc
@@ -64,15 +64,18 @@ class Simulation_2d(object):
         self.num_populations = len(self.phys_mu_list)
         self.nutrient_id = self.num_populations # The ID corresponding to the nutrient field
 
-        self.num_fields = num_populations + 1 # We need the concentration field
+        self.num_fields = self.num_populations + 1 # We need the concentration field
 
-        self.num_bins = np.int32(self.phys_Lx/self.phys_delta)
+        self.num_bins_x = np.int32(self.phys_Lx/self.phys_delta)
+        self.num_bins_y = np.int32(self.phys_Ly/self.phys_delta)
+
+        #### Create the particle dictionary ####
+        particle_id_num = 0
+        self.particle_dict = {}
 
         #### Inoculate Nutrients ####
         # Inoculate nutrient particles first. N particles per deme, roughly. The carrying capacity, basically.
-        total_num_nutrients = self.N * self.phys_Lx * self.phys_Ly
-
-        particle_id_num = 0
+        total_num_nutrients = np.int32(self.N * self.phys_Lx * self.phys_Ly)
 
         for i in range(total_num_nutrients):
             # Scatter randomly in space throughout the system. Positions are stored in NON-DIMENSIONAL SPACE
@@ -91,31 +94,43 @@ class Simulation_2d(object):
 
         #### Inoculate Populations ####
 
-        starting_num = num_particles / num_populations
+        # Inoculate them in a circle of width N. We can do this by drawing a random R and theta
+        # over a specified range
 
-        self.particle_dict = {}
-        for cur_pop in range(self.num_populations):
-            for i in range(starting_num):
-                particle_id = cur_pop*starting_num + i
-                cur_position = np.random.rand(2) * self.L
+        # Inoculate a density of N particles all over the circle...
+        total_num_population = np.int32(self.N * np.pi*self.phys_z**2)
 
-                cur_grid = np.int32(cur_position / interaction_length)
+        for _ in range(total_num_population):
 
-                new_particle = Particle(self, cur_pop, cur_position, cur_grid)
+            r = np.random.uniform(0, self.phys_z/self.Lc)
+            theta = np.random.uniform(0, 2*np.pi)
 
-                self.particle_dict[particle_id] = new_particle
+            x = r*np.cos(theta)
+            y = r*np.sin(theta)
 
+            cur_position = np.array([x, y], dtype=np.float32)
 
+            cur_grid = np.int32(cur_position / self.dim_delta)
 
-        # Setup the grid
-        self.grid = np.zeros((self.num_bins[0], self.num_bins[1], self.num_fields), dtype=np.int32)
+            pop_type = np.random.randint(self.num_populations)
+            new_particle = Particle(self, pop_type, cur_position, cur_grid,
+                                    D = self.dim_Di_list[pop_type],
+                                    k = self.micro_Gi_list[pop_type])
+
+            self.particle_dict[particle_id_num] = new_particle
+
+            particle_id_num += 1
+
+        #### Setup the grid ####
+
+        self.grid = np.zeros((self.num_bins_x, self.num_bins_y, self.num_fields), dtype=np.int32)
         for cur_particle in self.particle_dict.values():
             xy = cur_particle.grid_point
             pop_num = cur_particle.pop_type
 
             self.grid[xy[0], xy[1], pop_num] += 1
 
-        self.total_growth_grid = np.zeros((self.num_bins[0], self.num_bins[1]), dtype=np.int32)
+        self.total_growth_grid = np.zeros((self.num_bins_x, self.num_bins_y), dtype=np.int32)
 
     def react(self):
         """Right now, simple concentration-based growth"""
@@ -136,7 +151,7 @@ class Simulation_2d(object):
 
                 num_c = self.grid[x, y, concentration_index]
 
-                prob = num_c * cur_particle.k * self.dt
+                prob = num_c * cur_particle.k * self.dim_dt
                 rand = np.random.rand()
 
                 if rand < prob: # React!
@@ -185,8 +200,6 @@ class Simulation_2d(object):
         # Reset the growth grid
         self.total_growth_grid[:, :] = 0
 
-
-
     def move(self):
         for cur_particle in self.particle_dict.values():
             cur_particle.move()
@@ -214,16 +227,15 @@ class Particle(object):
 
         sim.grid[self.grid_point[0], self.grid_point[1], self.pop_type] -= 1
 
-
         rand2 = np.random.randn(2)
 
-        self.position += np.sqrt(2 * self.D * sim.dt) * rand2
+        self.position += np.sqrt(2 * self.D * sim.dim_dt) * rand2
 
         # Deal with moving out of the system...bounce back
         # The issue with bounceback is that if you move farther that the system size twice,
         # due to the randn draw, you can run into trouble...
-        Lx = sim.L[0]
-        Ly = sim.L[1]
+        Lx = sim.dim_Lx
+        Ly = sim.dim_Ly
 
         x = self.position[0]
         y = self.position[1]
@@ -244,14 +256,14 @@ class Particle(object):
         self.position[0] = x
         self.position[1] = y
 
-        gridx = np.int32(x / sim.interaction_length)
-        gridy = np.int32(y / sim.interaction_length)
+        gridx = np.int32(x / sim.dim_delta)
+        gridy = np.int32(y / sim.dim_delta)
 
         self.grid_point[0] = gridx
         self.grid_point[1] = gridy
 
-        xout = (self.grid_point[0] < 0) or (self.grid_point[0] > self.sim.num_bins[0] - 1)
-        yout = (self.grid_point[1] < 0) or (self.grid_point[1] > self.sim.num_bins[1] - 1)
+        xout = (self.grid_point[0] < 0) or (self.grid_point[0] > self.sim.num_bins_x - 1)
+        yout = (self.grid_point[1] < 0) or (self.grid_point[1] > self.sim.num_bins_y - 1)
 
         if xout or yout:
             print 'out of bounds, wtf'
