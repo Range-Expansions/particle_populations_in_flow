@@ -77,6 +77,8 @@ class Simulation_2d(object):
         # Inoculate nutrient particles first. N particles per deme, roughly. The carrying capacity, basically.
         total_num_nutrients = np.int32(self.N * self.phys_Lx * self.phys_Ly)
 
+        print 'Total number of nutrients:', total_num_nutrients
+
         for i in range(total_num_nutrients):
             # Scatter randomly in space throughout the system. Positions are stored in NON-DIMENSIONAL SPACE
             particle_id = particle_id_num
@@ -100,13 +102,18 @@ class Simulation_2d(object):
         # Inoculate a density of N particles all over the circle...
         total_num_population = np.int32(self.N * np.pi*self.phys_z**2)
 
+        print 'Number of particles in initial droplet:', total_num_population
+
+        x0 = self.dim_Lx/2.
+        y0 = self.dim_Ly/2.
+
         for _ in range(total_num_population):
 
             r = np.random.uniform(0, self.phys_z/self.Lc)
             theta = np.random.uniform(0, 2*np.pi)
 
-            x = r*np.cos(theta)
-            y = r*np.sin(theta)
+            x = x0 + r*np.cos(theta)
+            y = y0 + r*np.sin(theta)
 
             cur_position = np.array([x, y], dtype=np.float32)
 
