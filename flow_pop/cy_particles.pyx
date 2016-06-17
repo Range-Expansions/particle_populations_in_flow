@@ -114,8 +114,6 @@ cdef class Simulation_2d(object):
         self.dim_Lx = self.phys_Lx / self.Lc
         self.dim_Ly = self.phys_Ly / self.Lc
 
-        self.dim_L_array = np.array(self.dim_Lx, self.dim_Ly)
-
         self.num_populations = len(self.phys_mu_list)
         self.nutrient_id = self.num_populations # The ID corresponding to the nutrient field
 
@@ -137,7 +135,9 @@ cdef class Simulation_2d(object):
         for i in range(total_num_nutrients):
             # Scatter randomly in space throughout the system. Positions are stored in NON-DIMENSIONAL SPACE
             particle_id = particle_id_num
-            cur_position = np.random.rand(2) * self.dim_L_array
+
+            cur_x = np.random.rand() * self.dim_Lx
+            cur_y = np.random.rand() * self.dim_Ly
 
             cur_grid = np.int32(cur_position / self.dim_delta)
 
@@ -272,13 +272,17 @@ cdef class Simulation_2d(object):
             self.react()
 
 class Particle(object):
-    def __init__(self, simulation, pop_type, position, grid_point, D=1.0, k = 1.0):
+    def __init__(self, simulation, pop_type, x, y, gridx, gridy, D=1.0, k = 1.0):
 
         self.sim = simulation
 
         self.pop_type = np.int32(pop_type)
-        self.position = np.float32(position)
-        self.grid_point = np.int32(grid_point)
+
+        self.x = x
+        self.y = y
+
+        self.gridx = gridx
+        self.gridy = gridy
 
         self.D = D
         self.k = k
@@ -287,20 +291,19 @@ class Particle(object):
 
         sim = self.sim
 
-        sim.grid[self.grid_point[0], self.grid_point[1], self.pop_type] -= 1
+        sim.grid[self.gridx, self.gridy, self.pop_type] -= 1
 
-        rand2 = np.random.randn(2)
+        x = self.x
+        y = self.y
 
-        self.position += np.sqrt(2 * self.D * sim.dim_dt) * rand2
+        x += np.sqrt(2 * self.D * sim.dim_dt) * np.random.randn()
+        y += np.sqrt(2 * self.D * sim.dim_dt) * np.random.randn()
 
         # Deal with moving out of the system...bounce back
         # The issue with bounceback is that if you move farther that the system size twice,
         # due to the randn draw, you can run into trouble...
         Lx = sim.dim_Lx
         Ly = sim.dim_Ly
-
-        x = self.position[0]
-        y = self.position[1]
 
         if (x < 0):
             dx = (-x) % Lx
@@ -315,26 +318,18 @@ class Particle(object):
             dy = (y - Ly) % Ly  # Just to avoid super bounces
             y = Ly - dy - tolerance
 
-        self.position[0] = x
-        self.position[1] = y
 
         gridx = np.int32(x / sim.dim_delta)
         gridy = np.int32(y / sim.dim_delta)
 
-        self.grid_point[0] = gridx
-        self.grid_point[1] = gridy
+        self.x = x
+        self.y = y
 
-        xout = (self.grid_point[0] < 0) or (self.grid_point[0] > self.sim.num_bins_x - 1)
-        yout = (self.grid_point[1] < 0) or (self.grid_point[1] > self.sim.num_bins_y - 1)
-
-        if xout or yout:
-            print 'out of bounds, wtf'
-            print 'position:', self.position
-            print 'random:', rand2
-            print
+        self.gridx = gridx
+        self.gridy = gridy
 
         sim.grid[self.grid_point[0], self.grid_point[1], self.pop_type] += 1
 
     def birth(self):
-        return Particle(self.sim, self.pop_type, self.position, self.grid_point,
+        return Particle(self.sim, self.pop_type, self.x, self.y, self.gridx, self.gridy,
                         D=self.D, k=self.k)
