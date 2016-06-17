@@ -227,7 +227,9 @@ cdef class Simulation_2d(object):
         cdef int num_c
         cdef float prob, rand
 
-        for cur_key in self.particle_dict:
+        cdef int[:] list_of_keys = self.particle_dict.keys()
+
+        for cur_key in list_of_keys:
             cur_particle = self.particle_dict[cur_key]
             gridx = cur_particle.gridx
             gridy = cur_particle.gridy
@@ -251,7 +253,7 @@ cdef class Simulation_2d(object):
         positions_to_decrease = []
 
         # Adjust the nutrient field appropriately, based on the growth of the others
-        for cur_key in self.particle_dict:
+        for cur_key in list_of_keys:
             cur_particle = self.particle_dict[cur_key]
             x = cur_particle.gridx
             y = cur_particle.gridy
