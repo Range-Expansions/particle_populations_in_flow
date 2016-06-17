@@ -1,11 +1,15 @@
 import numpy as np
 cimport numpy as np
 
+from cython_gsl cimport *
+
 cdef float tolerance = 10.**-9.
 
 cdef class Simulation_2d(object):
 
     cdef:
+        unsigned long int seed
+
         public float phys_Lx
         public float phys_Ly
         public float phys_z
@@ -53,13 +57,23 @@ cdef class Simulation_2d(object):
 
         public int[:, :] total_growth_grid
 
+        gsl_rng *random_generator
+
+    def __cinit__(self, unsigned long int seed = 0, **kwargs):
+        self.seed = seed
+        cdef gsl_rng *r = gsl_rng_alloc(gsl_rng_mt19937)
+        gsl_rng_set(r, self.seed)
+        self.random_generator = r
+
+    def __dealloc__(self):
+        gsl_rng_free(self.random_generator)
 
     def __init__(self, float Lx=1., float Ly=1., float z = .1,
                  float N = 10., float R = 4., float time_prefactor = 0.1,
                  float droplet_density=1.0,
                  float mu_c = 1.0, mu_list = None,
                  float Dc = 1.0, D_list = None,
-                 float D_nutrient = 1.0):
+                 float D_nutrient = 1.0, **kwargs):
 
         self.phys_Lx = Lx
         self.phys_Ly = Ly
