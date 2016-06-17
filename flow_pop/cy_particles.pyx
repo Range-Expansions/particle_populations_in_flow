@@ -150,8 +150,8 @@ cdef class Simulation_2d(object):
             # Scatter randomly in space throughout the system. Positions are stored in NON-DIMENSIONAL SPACE
             particle_id = particle_id_num
 
-            cur_x = np.random.rand() * self.dim_Lx
-            cur_y = np.random.rand() * self.dim_Ly
+            cur_x = gsl_rng_uniform(self.random_generator) * self.dim_Lx
+            cur_y = gsl_rng_uniform(self.random_generator) * self.dim_Ly
 
             cur_gridx = np.int32(cur_x / self.dim_delta)
             cur_gridy = np.int32(cur_y / self.dim_delta)
@@ -179,16 +179,16 @@ cdef class Simulation_2d(object):
 
         for _ in range(total_num_population):
 
-            r = np.random.uniform(0, self.phys_z/self.Lc)
-            theta = np.random.uniform(0, 2*np.pi)
+            r = gsl_rng_uniform(self.random_generator)*self.phys_z/self.Lc
+            theta = gsl_rng_uniform(self.random_generator)*2*np.pi
 
-            x = x0 + r*np.cos(theta)
-            y = y0 + r*np.sin(theta)
+            x = x0 + r*gsl_sf_cos(theta)
+            y = y0 + r*gsl_sf_sin(theta)
 
-            xgrid = np.int32(x/ self.dim_delta)
-            ygrid = np.int32(y / self.dim_delta)
+            xgrid = int(x/ self.dim_delta)
+            ygrid = int(y / self.dim_delta)
 
-            pop_type = np.random.randint(self.num_populations)
+            pop_type = gsl_rng_uniform_int(self.random_generator, self.num_populations)
             new_particle = Particle(self, pop_type, x, y, xgrid, ygrid,
                                     D = self.dim_Di_list[pop_type],
                                     k = self.micro_Gi_list[pop_type])
