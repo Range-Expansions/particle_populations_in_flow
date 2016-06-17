@@ -85,17 +85,17 @@ cdef class Simulation_2d(object):
 
         #### Define Dimensionless Parameters ####
         self.dim_Di_list = D_list/(4*self.phys_Dc)
-        print 'dim_Di:', self.dim_Di_list
+        print 'dim_Di:', np.asarray(self.dim_Di_list)
 
         self.dim_D_nutrient = self.phys_D_nutrient/(4*self.phys_Dc)
-        print 'dim_D_nutrient:', self.dim_D_nutrient
+        print 'dim_D_nutrient:', np.asarray(self.dim_D_nutrient)
 
         np_Gi_list = mu_list/self.phys_muc
         self.dim_Gi_list = np_Gi_list
-        print 'dim_Gi:', self.dim_Gi_list
+        print 'dim_Gi:', np.asarray(self.dim_Gi_list)
 
         self.dim_Dgi_list = np_Gi_list/(self.phys_N*self.Lc**2) # Two-dimensional
-        print 'dim_Dgi:', self.dim_Dgi_list
+        print 'dim_Dgi:', np.asarray(self.dim_Dgi_list)
 
         #### Define Simulation Parameters ####
         self.phys_delta = self.Lc/self.R # The interaction length. R should be larger than or equal to 1, always.
@@ -105,7 +105,7 @@ cdef class Simulation_2d(object):
         self.N_L = self.phys_N * self.Lc**2 # Average number of particles inside a deme. Controls stochasticity.
 
         self.micro_Gi_list = np_Gi_list / self.N_delta # The microscopic reaction rates. Dimensionless.
-        print 'Microscopic Gi:', self.micro_Gi_list
+        print 'Microscopic Gi:', np.asarray(self.micro_Gi_list)
         self.dim_dt = time_prefactor * (1./np.max(self.micro_Gi_list))
         self.dim_dx = 1./self.R # The reaction radius spacing in dimensionless units
         print 'Time step (to resolve microscopic reaction rates):', self.dim_dt
@@ -139,9 +139,10 @@ cdef class Simulation_2d(object):
             cur_x = np.random.rand() * self.dim_Lx
             cur_y = np.random.rand() * self.dim_Ly
 
-            cur_grid = np.int32(cur_position / self.dim_delta)
+            cur_gridx = np.int32(cur_x / self.dim_delta)
+            cur_gridy = np.int32(cur_y / self.dim_delta)
 
-            new_particle = Particle(self, self.nutrient_id, cur_position, cur_grid,
+            new_particle = Particle(self, self.nutrient_id, cur_x, cur_y, cur_gridx, cur_gridy,
                                     D=self.dim_D_nutrient, k=0) # k is zero as nutrient decay is correleated with other growth
 
             self.particle_dict[particle_id] = new_particle
@@ -170,12 +171,11 @@ cdef class Simulation_2d(object):
             x = x0 + r*np.cos(theta)
             y = y0 + r*np.sin(theta)
 
-            cur_position = np.array([x, y], dtype=np.float32)
-
-            cur_grid = np.int32(cur_position / self.dim_delta)
+            xgrid = np.int32(x/ self.dim_delta)
+            ygrid = np.int32(y / self.dim_delta)
 
             pop_type = np.random.randint(self.num_populations)
-            new_particle = Particle(self, pop_type, cur_position, cur_grid,
+            new_particle = Particle(self, pop_type, x, y, xgrid, ygrid,
                                     D = self.dim_Di_list[pop_type],
                                     k = self.micro_Gi_list[pop_type])
 
@@ -187,10 +187,12 @@ cdef class Simulation_2d(object):
 
         self.grid = np.zeros((self.num_bins_x, self.num_bins_y, self.num_fields), dtype=np.int32)
         for cur_particle in self.particle_dict.values():
-            xy = cur_particle.grid_point
+            gridx = cur_particle.gridx
+            gridy = cur_particle.gridy
+
             pop_num = cur_particle.pop_type
 
-            self.grid[xy[0], xy[1], pop_num] += 1
+            self.grid[gridx, gridy, pop_num] += 1
 
         self.total_growth_grid = np.zeros((self.num_bins_x, self.num_bins_y), dtype=np.int32)
 
@@ -206,8 +208,8 @@ cdef class Simulation_2d(object):
 
         for cur_key in self.particle_dict:
             cur_particle = self.particle_dict[cur_key]
-            x = cur_particle.grid_point[0]
-            y = cur_particle.grid_point[1]
+            x = cur_particle.gridx
+            y = cur_particle.gridy
 
             if cur_particle.pop_type != concentration_index: # Last type is the concentration field
 
@@ -230,8 +232,8 @@ cdef class Simulation_2d(object):
         # Adjust the nutrient field appropriately, based on the growth of the others
         for cur_key in self.particle_dict:
             cur_particle = self.particle_dict[cur_key]
-            x = cur_particle.grid_point[0]
-            y = cur_particle.grid_point[1]
+            x = cur_particle.gridx
+            y = cur_particle.gridy
 
             if cur_particle.pop_type == concentration_index: # Last type is the concentration field
 
@@ -271,8 +273,19 @@ cdef class Simulation_2d(object):
             self.move()
             self.react()
 
-class Particle(object):
-    def __init__(self, simulation, pop_type, x, y, gridx, gridy, D=1.0, k = 1.0):
+cdef class Particle(object):
+    cdef:
+        public Simulation_2d sim
+        public int pop_type
+        public float x
+        public float y
+        public int gridx
+        public int gridy
+        public float D
+        public float k
+
+    def __init__(self, Simulation_2d simulation, int pop_type, float x, float y, int gridx, int gridy,
+                 float D=1.0, float k = 1.0):
 
         self.sim = simulation
 
@@ -289,7 +302,7 @@ class Particle(object):
 
     def move(self):
 
-        sim = self.sim
+        cdef Simulation_2d sim = self.sim
 
         sim.grid[self.gridx, self.gridy, self.pop_type] -= 1
 
@@ -328,7 +341,7 @@ class Particle(object):
         self.gridx = gridx
         self.gridy = gridy
 
-        sim.grid[self.grid_point[0], self.grid_point[1], self.pop_type] += 1
+        sim.grid[self.gridx, self.gridy, self.pop_type] += 1
 
     def birth(self):
         return Particle(self.sim, self.pop_type, self.x, self.y, self.gridx, self.gridy,
