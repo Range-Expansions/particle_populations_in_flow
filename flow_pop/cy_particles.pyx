@@ -220,14 +220,21 @@ cdef class Simulation_2d(object):
 
         concentration_index = self.num_fields - 1
 
+        cdef int cur_key
+        cdef Particle cur_particle, new_particle
+
+        cdef int gridx, gridy
+        cdef int num_c
+        cdef float prob, rand
+
         for cur_key in self.particle_dict:
             cur_particle = self.particle_dict[cur_key]
-            x = cur_particle.gridx
-            y = cur_particle.gridy
+            gridx = cur_particle.gridx
+            gridy = cur_particle.gridy
 
             if cur_particle.pop_type != concentration_index: # Last type is the concentration field
 
-                num_c = self.grid[x, y, concentration_index]
+                num_c = self.grid[gridx, gridy, concentration_index]
 
                 prob = num_c * cur_particle.k * self.dim_dt
                 rand = gsl_rng_uniform(self.random_generator)
@@ -235,8 +242,8 @@ cdef class Simulation_2d(object):
                 if rand < prob: # React!
                     new_particle = cur_particle.birth()
                     particles_to_add.append(new_particle)
-                    positions_to_increase.append([x, y, new_particle.pop_type])
-                    self.total_growth_grid[x, y] += 1
+                    positions_to_increase.append([gridx, gridy, new_particle.pop_type])
+                    self.total_growth_grid[gridx, gridy] += 1
 
         #### ADJUST THE NUTRIENT FIELD APPROPRIATELY ####
 
@@ -265,6 +272,7 @@ cdef class Simulation_2d(object):
         # Add new particles to the dictionary that were born
         max_key = np.max(self.particle_dict.keys())
         count = 1
+
         for cur_particle in particles_to_add:
             self.particle_dict[max_key + count] = cur_particle
             count += 1
@@ -366,6 +374,6 @@ cdef class Particle(object):
 
         sim.grid[self.gridx, self.gridy, self.pop_type] += 1
 
-    def birth(self):
+    cdef Particle birth(Particle self):
         return Particle(self.sim, self.pop_type, self.x, self.y, self.gridx, self.gridy,
                         D=self.D, k=self.k)
