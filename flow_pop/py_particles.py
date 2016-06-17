@@ -78,7 +78,7 @@ class Simulation_2d(object):
         self.particle_dict = {}
 
         #### Inoculate Nutrients ####
-        # Inoculate nutrient particles first. N particles per deme, roughly. The carrying capacity, basically.
+        # Inoculate nutrient particles first. phys_N particles per deme, roughly. The carrying capacity, basically.
         total_num_nutrients = np.int32(self.N * self.phys_Lx * self.phys_Ly)
 
         print 'Total number of nutrients:', total_num_nutrients
@@ -100,10 +100,10 @@ class Simulation_2d(object):
 
         #### Inoculate Populations ####
 
-        # Inoculate them in a circle of width N. We can do this by drawing a random R and theta
+        # Inoculate them in a circle of width phys_N. We can do this by drawing a random R and theta
         # over a specified range
 
-        # Inoculate a density of N particles all over the circle...
+        # Inoculate a density of phys_N particles all over the circle...
         total_num_population = np.int32(self.droplet_density * np.pi*self.phys_z**2)
 
         print 'Number of particles in initial droplet:', total_num_population

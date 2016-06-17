@@ -1,22 +1,71 @@
 import numpy as np
 cimport numpy as np
 
-tolerance = 10.**-9.
+cdef float tolerance = 10.**-9.
 
-class Simulation_2d(object):
+cdef class Simulation_2d(object):
 
-    def __init__(self, Lx=1., Ly=1., z = .1,
-                 N = 10., R = 4., time_prefactor = 0.1,
-                 droplet_density=1.0,
-                 mu_c = 1.0, mu_list = None,
-                 Dc = 1.0, D_list = None,
-                 D_nutrient = 1.0):
+    cdef:
+        public float phys_Lx
+        public float phys_Ly
+        public float phys_z
+        public float phys_N
+        public float droplet_density
+        public float R
+        public float time_prefactor
+        public float phys_muc
+        public float[:] phys_mu_list
+        public float phys_Dc
+        public float[:] phys_D_list
+        public float phys_D_nutrient
+
+        public float Lc
+        public float Tc
+        public float[:] dim_Di_list
+        public float dim_D_nutrient
+        public float[:] dim_Gi_list
+        public float[:] dim_Dgi_list
+
+        public float phys_delta
+        public float dim_delta
+        public float N_delta
+        public float N_L
+
+        public float[:] micro_Gi_list
+
+        public float dim_dt
+        public float dim_dx
+
+        public float dim_Lx
+        public float dim_Ly
+
+        public float[:] dim_L_array
+
+        public int num_populations
+        public int nutrient_id
+        public int num_fields
+
+        public int num_bins_x
+        public int num_bins_y
+
+        public dict particle_dict
+        public int[:, :, :] grid
+
+        public int[:, :, :] total_growth_grid
+
+
+    def __init__(self, float Lx=1., float Ly=1., float z = .1,
+                 float N = 10., float R = 4., float time_prefactor = 0.1,
+                 float droplet_density=1.0,
+                 float mu_c = 1.0, float[:] mu_list = None,
+                 float Dc = 1.0, float[:] D_list = None,
+                 float D_nutrient = 1.0):
 
         self.phys_Lx = Lx
         self.phys_Ly = Ly
         self.phys_z = z
 
-        self.N = N # Number of particles per unit area
+        self.phys_N = N # Number of particles per unit area
         self.droplet_density = droplet_density # Number of particles per unit area in the droplet
         self.R = R # Resolution: Number of interaction lengths a deme of size Lc is divided into
         self.time_prefactor = time_prefactor
@@ -44,15 +93,15 @@ class Simulation_2d(object):
         self.dim_Gi_list = self.phys_mu_list/self.phys_muc
         print 'dim_Gi:', self.dim_Gi_list
 
-        self.dim_Dgi_list = self.dim_Gi_list/(self.N*self.Lc**2) # Two-dimensional
+        self.dim_Dgi_list = self.dim_Gi_list/(self.phys_N*self.Lc**2) # Two-dimensional
         print 'dim_Dgi:', self.dim_Dgi_list
 
         #### Define Simulation Parameters ####
         self.phys_delta = self.Lc/self.R # The interaction length. R should be larger than or equal to 1, always.
         self.dim_delta = self.phys_delta / self.Lc
 
-        self.N_delta = self.N * self.phys_delta**2 # Average number of particles inside the interaction radius
-        self.N_L = self.N * self.Lc**2 # Average number of particles inside a deme. Controls stochasticity.
+        self.N_delta = self.phys_N * self.phys_delta**2 # Average number of particles inside the interaction radius
+        self.N_L = self.phys_N * self.Lc**2 # Average number of particles inside a deme. Controls stochasticity.
 
         self.micro_Gi_list = self.dim_Gi_list / self.N_delta # The microscopic reaction rates. Dimensionless.
         print 'Microscopic Gi:', self.micro_Gi_list
@@ -79,8 +128,8 @@ class Simulation_2d(object):
         self.particle_dict = {}
 
         #### Inoculate Nutrients ####
-        # Inoculate nutrient particles first. N particles per deme, roughly. The carrying capacity, basically.
-        total_num_nutrients = np.int32(self.N * self.phys_Lx * self.phys_Ly)
+        # Inoculate nutrient particles first. phys_N particles per deme, roughly. The carrying capacity, basically.
+        total_num_nutrients = np.int32(self.phys_N * self.phys_Lx * self.phys_Ly)
 
         print 'Total number of nutrients:', total_num_nutrients
 
@@ -101,10 +150,10 @@ class Simulation_2d(object):
 
         #### Inoculate Populations ####
 
-        # Inoculate them in a circle of width N. We can do this by drawing a random R and theta
+        # Inoculate them in a circle of width phys_N. We can do this by drawing a random R and theta
         # over a specified range
 
-        # Inoculate a density of N particles all over the circle...
+        # Inoculate a density of phys_N particles all over the circle...
         total_num_population = np.int32(self.droplet_density * np.pi*self.phys_z**2)
 
         print 'Number of particles in initial droplet:', total_num_population
