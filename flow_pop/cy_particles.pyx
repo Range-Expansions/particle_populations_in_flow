@@ -133,8 +133,8 @@ cdef class Simulation_2d(object):
 
         self.num_fields = self.num_populations + 1 # We need the concentration field
 
-        self.num_bins_x = np.int32(self.phys_Lx/self.phys_delta)
-        self.num_bins_y = np.int32(self.phys_Ly/self.phys_delta)
+        self.num_bins_x = np.int32(self.phys_Lx/self.phys_delta) + 1
+        self.num_bins_y = np.int32(self.phys_Ly/self.phys_delta) + 1
 
         #### Create the particle dictionary ####
         particle_id_num = 0
@@ -371,6 +371,14 @@ cdef class Particle(object):
 
         self.gridx = gridx
         self.gridy = gridy
+
+        xout = (self.gridx < 0) or (self.gridx > self.sim.num_bins_x - 1)
+        yout = (self.gridy < 0) or (self.gridy > self.sim.num_bins_y - 1)
+
+        if xout or yout:
+            print 'out of bounds, wtf'
+            print 'position:', self.x, self.y
+            print
 
         sim.grid[self.gridx, self.gridy, self.pop_type] += 1
 

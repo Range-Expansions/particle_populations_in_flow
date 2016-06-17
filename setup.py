@@ -8,7 +8,7 @@ from distutils.core import setup
 extensions = [
     Extension("flow_pop.cy_particles",
               sources=["flow_pop/cy_particles.pyx"],
-              language="c", libraries = cython_gsl.get_libraries(),
+              language="c++", libraries = cython_gsl.get_libraries(),
               library_dirs = [cython_gsl.get_library_dir()],
               include_dirs = [cython_gsl.get_cython_include_dir(), np.get_include()])
 ]
