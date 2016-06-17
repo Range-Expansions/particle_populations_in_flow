@@ -230,7 +230,7 @@ cdef class Simulation_2d(object):
                 num_c = self.grid[x, y, concentration_index]
 
                 prob = num_c * cur_particle.k * self.dim_dt
-                rand = np.random.rand()
+                rand = gsl_rng_uniform(self.random_generator)
 
                 if rand < prob: # React!
                     new_particle = cur_particle.birth()
@@ -320,34 +320,43 @@ cdef class Particle(object):
 
         sim.grid[self.gridx, self.gridy, self.pop_type] -= 1
 
-        x = self.x
-        y = self.y
+        cdef float x = self.x
+        cdef float y = self.y
 
-        x += np.sqrt(2 * self.D * sim.dim_dt) * np.random.randn()
-        y += np.sqrt(2 * self.D * sim.dim_dt) * np.random.randn()
+        cdef float Lx, Ly, dx, dy
+        cdef int gridx, gridy
 
-        # Deal with moving out of the system...bounce back
-        # The issue with bounceback is that if you move farther that the system size twice,
-        # due to the randn draw, you can run into trouble...
-        Lx = sim.dim_Lx
-        Ly = sim.dim_Ly
+        cdef float D = self.D
+        cdef float dt = sim.dim_dt
 
-        if (x < 0):
-            dx = (-x) % Lx
-            x = dx + tolerance
-        elif (x > Lx):
-            dx = (x - Lx) % Lx # Just to avoid super bounces
-            x = Lx - dx - tolerance
-        if (y < 0):
-            dy = (-y) % Ly
-            y = dy + tolerance
-        elif (y > Ly):
-            dy = (y - Ly) % Ly  # Just to avoid super bounces
-            y = Ly - dy - tolerance
+        cdef gsl_rng *r = sim.random_generator
 
+        with nogil:
 
-        gridx = np.int32(x / sim.dim_delta)
-        gridy = np.int32(y / sim.dim_delta)
+            x += sqrt(2 * D * dt) * gsl_ran_gaussian(r, 1)
+            y += sqrt(2 * D * dt) * gsl_ran_gaussian(r, 1)
+
+            # Deal with moving out of the system...bounce back
+            # The issue with bounceback is that if you move farther that the system size twice,
+            # due to the randn draw, you can run into trouble...
+            Lx = sim.dim_Lx
+            Ly = sim.dim_Ly
+
+            if (x < 0):
+                dx = (-x) % Lx
+                x = dx + tolerance
+            elif (x > Lx):
+                dx = (x - Lx) % Lx # Just to avoid super bounces
+                x = Lx - dx - tolerance
+            if (y < 0):
+                dy = (-y) % Ly
+                y = dy + tolerance
+            elif (y > Ly):
+                dy = (y - Ly) % Ly  # Just to avoid super bounces
+                y = Ly - dy - tolerance
+
+            gridx = int(x / sim.dim_delta)
+            gridy = int(y / sim.dim_delta)
 
         self.x = x
         self.y = y
