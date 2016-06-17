@@ -51,7 +51,7 @@ cdef class Simulation_2d(object):
         public dict particle_dict
         public int[:, :, :] grid
 
-        public int[:, :, :] total_growth_grid
+        public int[:, :] total_growth_grid
 
 
     def __init__(self, float Lx=1., float Ly=1., float z = .1,
