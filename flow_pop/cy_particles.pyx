@@ -326,13 +326,14 @@ cdef class Particle(object):
 
         cdef Simulation_2d sim = self.sim
 
-        sim.grid[self.gridx, self.gridy, self.pop_type] -= 1
+        cdef int gridx_start = self.gridx
+        cdef int gridy_start = self.gridy
 
         cdef float x = self.x
         cdef float y = self.y
 
         cdef float Lx, Ly, dx, dy
-        cdef int gridx, gridy
+        cdef int gridx_finish, gridy_finish
 
         cdef float D = self.D
         cdef float dt = sim.dim_dt
@@ -363,24 +364,28 @@ cdef class Particle(object):
                 dy = (y - Ly) % Ly  # Just to avoid super bounces
                 y = Ly - dy - tolerance
 
-            gridx = int(x / sim.dim_delta)
-            gridy = int(y / sim.dim_delta)
+            gridx_finish = int(x / sim.dim_delta)
+            gridy_finish = int(y / sim.dim_delta)
 
         self.x = x
         self.y = y
 
-        self.gridx = gridx
-        self.gridy = gridy
+        if (gridx_start != gridx_finish) or (gridy_start != gridy_finish):
+            self.gridx = gridx_finish
+            self.gridy = gridy_finish
 
-        xout = (self.gridx < 0) or (self.gridx > self.sim.num_bins_x - 1)
-        yout = (self.gridy < 0) or (self.gridy > self.sim.num_bins_y - 1)
+            sim.grid[gridx_start, gridy_start, self.pop_type] -= 1
+            sim.grid[gridx_finish, gridy_finish, self.pop_type] += 1
 
-        if xout or yout:
-            print 'out of bounds, wtf'
-            print 'position:', self.x, self.y
-            print
+        # xout = (self.gridx < 0) or (self.gridx > self.sim.num_bins_x - 1)
+        # yout = (self.gridy < 0) or (self.gridy > self.sim.num_bins_y - 1)
+        #
+        # if xout or yout:
+        #     print 'out of bounds, wtf'
+        #     print 'position:', self.x, self.y
+        #     print
 
-        sim.grid[self.gridx, self.gridy, self.pop_type] += 1
+
 
     cdef Particle birth(Particle self):
         return Particle(self.sim, self.pop_type, self.x, self.y, self.gridx, self.gridy,
