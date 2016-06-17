@@ -57,8 +57,8 @@ cdef class Simulation_2d(object):
     def __init__(self, float Lx=1., float Ly=1., float z = .1,
                  float N = 10., float R = 4., float time_prefactor = 0.1,
                  float droplet_density=1.0,
-                 float mu_c = 1.0, float[:] mu_list = None,
-                 float Dc = 1.0, float[:] D_list = None,
+                 float mu_c = 1.0, mu_list = None,
+                 float Dc = 1.0, D_list = None,
                  float D_nutrient = 1.0):
 
         self.phys_Lx = Lx
@@ -84,16 +84,17 @@ cdef class Simulation_2d(object):
         print 'Tc (characteristic time scale, physical units):', self.Tc
 
         #### Define Dimensionless Parameters ####
-        self.dim_Di_list = self.phys_D_list/(4*self.phys_Dc)
+        self.dim_Di_list = D_list/(4*self.phys_Dc)
         print 'dim_Di:', self.dim_Di_list
 
         self.dim_D_nutrient = self.phys_D_nutrient/(4*self.phys_Dc)
         print 'dim_D_nutrient:', self.dim_D_nutrient
 
-        self.dim_Gi_list = self.phys_mu_list/self.phys_muc
+        np_Gi_list = mu_list/self.phys_muc
+        self.dim_Gi_list = np_Gi_list
         print 'dim_Gi:', self.dim_Gi_list
 
-        self.dim_Dgi_list = self.dim_Gi_list/(self.phys_N*self.Lc**2) # Two-dimensional
+        self.dim_Dgi_list = np_Gi_list/(self.phys_N*self.Lc**2) # Two-dimensional
         print 'dim_Dgi:', self.dim_Dgi_list
 
         #### Define Simulation Parameters ####
@@ -103,7 +104,7 @@ cdef class Simulation_2d(object):
         self.N_delta = self.phys_N * self.phys_delta**2 # Average number of particles inside the interaction radius
         self.N_L = self.phys_N * self.Lc**2 # Average number of particles inside a deme. Controls stochasticity.
 
-        self.micro_Gi_list = self.dim_Gi_list / self.N_delta # The microscopic reaction rates. Dimensionless.
+        self.micro_Gi_list = np_Gi_list / self.N_delta # The microscopic reaction rates. Dimensionless.
         print 'Microscopic Gi:', self.micro_Gi_list
         self.dim_dt = time_prefactor * (1./np.max(self.micro_Gi_list))
         self.dim_dx = 1./self.R # The reaction radius spacing in dimensionless units
