@@ -217,10 +217,12 @@ cdef class Simulation_2d(object):
 
         ##### REACT POPULATION PARTICLES ####
 
-        particles_to_add = []
-        positions_to_increase = []
+        cdef vector[Particle] particles_to_add
+        cdef vector[int] x_to_increase
+        cdef vector[int] y_to_increase
+        cdef vector[int] pop_type_to_increase
 
-        concentration_index = self.num_fields - 1
+        cdef int concentration_index = self.num_fields - 1
 
         cdef Particle cur_particle, new_particle
 
@@ -250,14 +252,20 @@ cdef class Simulation_2d(object):
 
                 if rand < prob: # React!
                     new_particle = cur_particle.birth()
-                    particles_to_add.append(new_particle)
-                    positions_to_increase.append([gridx, gridy, new_particle.pop_type])
+                    particles_to_add.push_back(new_particle)
+
+                    x_to_increase.push_back(gridx)
+                    y_to_increase.push_back(gridy)
+                    pop_type_to_increase.push_back(new_particle.pop_type)
+
                     total_growth_grid[gridx, gridy] += 1
 
         #### ADJUST THE NUTRIENT FIELD APPROPRIATELY ####
 
-        keys_to_delete = []
-        positions_to_decrease = []
+        cdef vector[int] keys_to_delete = []
+        cdef vector[int] x_to_decrease
+        cdef vector[int] y_to_decrease
+        cdef vector[int] pop_type_to_decrease
 
         # Adjust the nutrient field appropriately, based on the growth of the others
         for i in range(list_of_keys.shape[0]):
@@ -269,29 +277,41 @@ cdef class Simulation_2d(object):
             if cur_particle.pop_type == concentration_index: # Last type is the concentration field
 
                 if total_growth_grid[x, y] > 0:
-                    positions_to_decrease.append([x, y, cur_particle.pop_type])
-                    keys_to_delete.append(cur_key)
+                    x_to_decrease.push_back(x)
+                    y_to_decrease.push_back(y)
+                    pop_type_to_decrease.push_back(cur_particle.pop_type)
+
+                    keys_to_delete.push_back(cur_key)
+
                     total_growth_grid[x, y] -= 1
 
         #### UPDATE THE GRIDS AND PARTICLE DICTIONARY ####
 
         # Remove particles that died (nutrients)
-        for cur_key in keys_to_delete:
+        for i in range(keys_to_delete.size()):
+            cur_key = keys_to_delete[i]
             del self.particle_dict[cur_key]
 
         # Add new particles to the dictionary that were born
         cdef int max_key = np.max(self.particle_dict.keys())
         cdef int count = 1
 
-        for cur_particle in particles_to_add:
+        for i in range(particles_to_add.size()):
+            cur_particle = particles_to_add[i]
             self.particle_dict[max_key + count] = cur_particle
             count += 1
 
         # Update the grid based on populations
-        for xyc in positions_to_increase:
-            grid[xyc[0], xyc[1], xyc[2]] += 1
-        for xyc in positions_to_decrease:
-            grid[xyc[0], xyc[1], xyc[2]] -= 1
+        for i in x_to_increase.size():
+            x = x_to_increase[i]
+            y = y_to_increase[i]
+            p = pop_type_to_increase[i]
+            grid[x, y, p] += 1
+        for i in x_to_decrease:
+            x = x_to_decrease[i]
+            y = y_to_decrease[i]
+            p = pop_type_to_decrease[i]
+            grid[x, y, p] -= 1
 
         # Reset the growth grid
         total_growth_grid[:, :] = 0
