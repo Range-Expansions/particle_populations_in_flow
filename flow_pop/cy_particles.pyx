@@ -1,8 +1,10 @@
-#cython: profile=False
+#cython: profile=True
+#cython: linetrace=True
 #cython: initializedcheck=False
 #cython: nonecheck=False
 #cython: wraparound=False
 #cython: boundscheck=False
+#cython: cdivision=True
 
 import numpy as np
 cimport numpy as np
@@ -12,6 +14,18 @@ from libcpp.vector cimport vector
 from cython_gsl cimport *
 
 cdef float tolerance = 10.**-9.
+
+cdef int c_pos_mod_int(int num1, int num2) nogil:
+    if num1 < 0:
+        return num1 + num2
+    else:
+        return num1 % num2
+
+cdef float c_pos_mod_float(float num1, float num2) nogil:
+    if num1 < 0:
+        return num1 + num2
+    else:
+        return num1 % num2
 
 cdef class Simulation_2d(object):
 
@@ -218,7 +232,7 @@ cdef class Simulation_2d(object):
 
         self.total_growth_grid = np.zeros((self.num_bins_x, self.num_bins_y), dtype=np.int32)
 
-    def react(self):
+    cpdef void react(Simulation_2d self):
         """Right now, simple concentration-based growth"""
 
         ##### REACT POPULATION PARTICLES ####
@@ -309,25 +323,30 @@ cdef class Simulation_2d(object):
             count += 1
 
         # Update the grid based on populations
-        for i in range(x_to_increase.size()):
-            x = x_to_increase[i]
-            y = y_to_increase[i]
-            p = pop_type_to_increase[i]
-            grid[x, y, p] += 1
-        for i in range(x_to_decrease.size()):
-            x = x_to_decrease[i]
-            y = y_to_decrease[i]
-            p = pop_type_to_decrease[i]
-            grid[x, y, p] -= 1
 
-        # Reset the growth grid
-        total_growth_grid[:, :] = 0
+        with nogil:
+            for i in range(x_to_increase.size()):
+                x = x_to_increase[i]
+                y = y_to_increase[i]
+                p = pop_type_to_increase[i]
+                grid[x, y, p] += 1
+            for i in range(x_to_decrease.size()):
+                x = x_to_decrease[i]
+                y = y_to_decrease[i]
+                p = pop_type_to_decrease[i]
+                grid[x, y, p] -= 1
 
-    def move(self):
-        for cur_particle in self.particle_dict.values():
+            # Reset the growth grid
+            total_growth_grid[:, :] = 0
+
+    cpdef void move(Simulation_2d self):
+        cdef Particle cur_particle
+        cdef Particle[:] list_of_particles = np.array(self.particle_dict.values())
+        for cur_particle in list_of_particles:
             cur_particle.move()
 
-    def run(self, num_iterations):
+    cpdef void run(Simulation_2d self, long num_iterations):
+        cdef long i
         for i in range(num_iterations):
             self.move()
             self.react()
@@ -389,16 +408,16 @@ cdef class Particle(object):
             Ly = sim.dim_Ly
 
             if (x < 0):
-                dx = (-x) % Lx
+                dx = c_pos_mod_float(-x, Lx)
                 x = dx + tolerance
             elif (x > Lx):
-                dx = (x - Lx) % Lx # Just to avoid super bounces
+                dx = c_pos_mod_float(x - Lx, Lx) # Just to avoid super bounces
                 x = Lx - dx - tolerance
             if (y < 0):
-                dy = (-y) % Ly
+                dy = c_pos_mod_float(-y, Ly)
                 y = dy + tolerance
             elif (y > Ly):
-                dy = (y - Ly) % Ly  # Just to avoid super bounces
+                dy = c_pos_mod_float(y - Ly, Ly)  # Just to avoid super bounces
                 y = Ly - dy - tolerance
 
             gridx_finish = int(x / sim.dim_delta)
