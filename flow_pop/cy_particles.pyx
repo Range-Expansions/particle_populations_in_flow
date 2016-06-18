@@ -217,7 +217,7 @@ cdef class Simulation_2d(object):
 
         ##### REACT POPULATION PARTICLES ####
 
-        cdef vector[Particle] particles_to_add
+        cdef list particles_to_add = []
         cdef vector[int] x_to_increase
         cdef vector[int] y_to_increase
         cdef vector[int] pop_type_to_increase
@@ -252,7 +252,7 @@ cdef class Simulation_2d(object):
 
                 if rand < prob: # React!
                     new_particle = cur_particle.birth()
-                    particles_to_add.push_back(new_particle)
+                    particles_to_add.append(new_particle)
 
                     x_to_increase.push_back(gridx)
                     y_to_increase.push_back(gridy)
@@ -262,7 +262,7 @@ cdef class Simulation_2d(object):
 
         #### ADJUST THE NUTRIENT FIELD APPROPRIATELY ####
 
-        cdef vector[int] keys_to_delete = []
+        cdef vector[int] keys_to_delete
         cdef vector[int] x_to_decrease
         cdef vector[int] y_to_decrease
         cdef vector[int] pop_type_to_decrease
@@ -296,18 +296,17 @@ cdef class Simulation_2d(object):
         cdef int max_key = np.max(self.particle_dict.keys())
         cdef int count = 1
 
-        for i in range(particles_to_add.size()):
-            cur_particle = particles_to_add[i]
+        for cur_particle in particles_to_add:
             self.particle_dict[max_key + count] = cur_particle
             count += 1
 
         # Update the grid based on populations
-        for i in x_to_increase.size():
+        for i in range(x_to_increase.size()):
             x = x_to_increase[i]
             y = y_to_increase[i]
             p = pop_type_to_increase[i]
             grid[x, y, p] += 1
-        for i in x_to_decrease:
+        for i in range(x_to_decrease.size()):
             x = x_to_decrease[i]
             y = y_to_decrease[i]
             p = pop_type_to_decrease[i]
