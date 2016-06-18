@@ -227,7 +227,7 @@ cdef class Simulation_2d(object):
         cdef int num_c
         cdef float prob, rand
 
-        cdef int[:] list_of_keys = self.particle_dict.keys()
+        cdef int[:] list_of_keys = np.array(self.particle_dict.keys(), dtype=np.int32)
 
         for cur_key in list_of_keys:
             cur_particle = self.particle_dict[cur_key]
