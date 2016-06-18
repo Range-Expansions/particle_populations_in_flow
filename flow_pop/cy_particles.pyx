@@ -1,3 +1,9 @@
+#cython: profile=False
+#cython: initializedcheck=False
+#cython: nonecheck=False
+#cython: wraparound=False
+#cython: boundscheck=False
+
 import numpy as np
 cimport numpy as np
 
@@ -247,18 +253,20 @@ cdef class Simulation_2d(object):
 
                 num_c = grid[gridx, gridy, concentration_index]
 
-                prob = num_c * cur_particle.k * self.dim_dt
-                rand = gsl_rng_uniform(self.random_generator)
+                if num_c != 0:
 
-                if rand < prob: # React!
-                    new_particle = cur_particle.birth()
-                    particles_to_add.append(new_particle)
+                    prob = num_c * cur_particle.k * self.dim_dt
+                    rand = gsl_rng_uniform(self.random_generator)
 
-                    x_to_increase.push_back(gridx)
-                    y_to_increase.push_back(gridy)
-                    pop_type_to_increase.push_back(new_particle.pop_type)
+                    if rand < prob: # React!
+                        new_particle = cur_particle.birth()
+                        particles_to_add.append(new_particle)
 
-                    total_growth_grid[gridx, gridy] += 1
+                        x_to_increase.push_back(gridx)
+                        y_to_increase.push_back(gridy)
+                        pop_type_to_increase.push_back(new_particle.pop_type)
+
+                        total_growth_grid[gridx, gridy] += 1
 
         #### ADJUST THE NUTRIENT FIELD APPROPRIATELY ####
 
