@@ -1,6 +1,8 @@
 import numpy as np
 cimport numpy as np
 
+from libcpp.vector cimport vector
+
 from cython_gsl cimport *
 
 cdef float tolerance = 10.**-9.
@@ -220,7 +222,6 @@ cdef class Simulation_2d(object):
 
         concentration_index = self.num_fields - 1
 
-        cdef int cur_key
         cdef Particle cur_particle, new_particle
 
         cdef int gridx, gridy
@@ -228,15 +229,21 @@ cdef class Simulation_2d(object):
         cdef float prob, rand
 
         cdef int[:] list_of_keys = np.array(self.particle_dict.keys(), dtype=np.int32)
+        cdef int cur_key
+        cdef int i
 
-        for cur_key in list_of_keys:
+        cdef int[:, :, :] grid = self.grid
+        cdef int[:, :] total_growth_grid = self.total_growth_grid
+
+        for i in range(list_of_keys.shape[0]):
+            cur_key = list_of_keys[i]
             cur_particle = self.particle_dict[cur_key]
             gridx = cur_particle.gridx
             gridy = cur_particle.gridy
 
             if cur_particle.pop_type != concentration_index: # Last type is the concentration field
 
-                num_c = self.grid[gridx, gridy, concentration_index]
+                num_c = grid[gridx, gridy, concentration_index]
 
                 prob = num_c * cur_particle.k * self.dim_dt
                 rand = gsl_rng_uniform(self.random_generator)
@@ -245,7 +252,7 @@ cdef class Simulation_2d(object):
                     new_particle = cur_particle.birth()
                     particles_to_add.append(new_particle)
                     positions_to_increase.append([gridx, gridy, new_particle.pop_type])
-                    self.total_growth_grid[gridx, gridy] += 1
+                    total_growth_grid[gridx, gridy] += 1
 
         #### ADJUST THE NUTRIENT FIELD APPROPRIATELY ####
 
@@ -253,17 +260,18 @@ cdef class Simulation_2d(object):
         positions_to_decrease = []
 
         # Adjust the nutrient field appropriately, based on the growth of the others
-        for cur_key in list_of_keys:
+        for i in range(list_of_keys.shape[0]):
+            cur_key = list_of_keys[i]
             cur_particle = self.particle_dict[cur_key]
             x = cur_particle.gridx
             y = cur_particle.gridy
 
             if cur_particle.pop_type == concentration_index: # Last type is the concentration field
 
-                if self.total_growth_grid[x, y] > 0:
+                if total_growth_grid[x, y] > 0:
                     positions_to_decrease.append([x, y, cur_particle.pop_type])
                     keys_to_delete.append(cur_key)
-                    self.total_growth_grid[x, y] -= 1
+                    total_growth_grid[x, y] -= 1
 
         #### UPDATE THE GRIDS AND PARTICLE DICTIONARY ####
 
@@ -272,8 +280,8 @@ cdef class Simulation_2d(object):
             del self.particle_dict[cur_key]
 
         # Add new particles to the dictionary that were born
-        max_key = np.max(self.particle_dict.keys())
-        count = 1
+        cdef int max_key = np.max(self.particle_dict.keys())
+        cdef int count = 1
 
         for cur_particle in particles_to_add:
             self.particle_dict[max_key + count] = cur_particle
@@ -281,12 +289,12 @@ cdef class Simulation_2d(object):
 
         # Update the grid based on populations
         for xyc in positions_to_increase:
-            self.grid[xyc[0], xyc[1], xyc[2]] += 1
+            grid[xyc[0], xyc[1], xyc[2]] += 1
         for xyc in positions_to_decrease:
-            self.grid[xyc[0], xyc[1], xyc[2]] -= 1
+            grid[xyc[0], xyc[1], xyc[2]] -= 1
 
         # Reset the growth grid
-        self.total_growth_grid[:, :] = 0
+        total_growth_grid[:, :] = 0
 
     def move(self):
         for cur_particle in self.particle_dict.values():
