@@ -3,7 +3,7 @@
 #cython: initializedcheck=False
 #cython: nonecheck=False
 #cython: wraparound=False
-#cython: boundscheck=False
+#cython: boundscheck=True
 #cython: cdivision=True
 
 import numpy as np
@@ -74,7 +74,7 @@ cdef class Simulation_2d(object):
         public int num_bins_x
         public int num_bins_y
 
-        public dict particle_dict
+        public Py_Particle[:] particle_array
         public int[:, :, :] grid
 
         public int[:, :] total_growth_grid
@@ -160,7 +160,7 @@ cdef class Simulation_2d(object):
 
         #### Create the particle dictionary ####
         particle_id_num = 0
-        self.particle_dict = {}
+        particle_array = []
 
         #### Inoculate Nutrients ####
         # Inoculate nutrient particles first. phys_N particles per deme, roughly. The carrying capacity, basically.
@@ -181,7 +181,7 @@ cdef class Simulation_2d(object):
             new_particle = Particle(self, self.nutrient_id, cur_x, cur_y, cur_gridx, cur_gridy,
                                     D=self.dim_D_nutrient, k=0) # k is zero as nutrient decay is correleated with other growth
 
-            self.particle_dict[particle_id] = new_particle
+            particle_array.append(new_particle)
 
             particle_id_num += 1
 
@@ -215,9 +215,11 @@ cdef class Simulation_2d(object):
                                     D = self.dim_Di_list[pop_type],
                                     k = self.micro_Gi_list[pop_type])
 
-            self.particle_dict[particle_id_num] = new_particle
+            particle_array.append(new_particle)
 
             particle_id_num += 1
+
+        self.particle_array = np.array(particle_array, dtype=Py_Particle)
 
         #### Setup the grid ####
 
@@ -244,7 +246,7 @@ cdef class Simulation_2d(object):
 
         cdef int concentration_index = self.num_fields - 1
 
-        cdef Particle cur_particle, new_particle
+        cdef Py_Particle cur_particle, new_particle
 
         cdef int gridx, gridy
         cdef int num_c
@@ -340,8 +342,8 @@ cdef class Simulation_2d(object):
             total_growth_grid[:, :] = 0
 
     cpdef void move(Simulation_2d self):
-        cdef Particle cur_particle
-        cdef Particle[:] list_of_particles = np.array(self.particle_dict.values())
+        cdef Py_Particle cur_particle
+        cdef Py_Particle[:] list_of_particles = np.array(self.particle_dict.values())
         for cur_particle in list_of_particles:
             cur_particle.move()
 
@@ -351,7 +353,18 @@ cdef class Simulation_2d(object):
             self.move()
             self.react()
 
-cdef class Particle(object):
+cdef struct s_Particle: # Define a structure
+    int pop_type
+    float x
+    float y
+    int gridx
+    int gridy
+    float D
+    float k
+
+ctypedef s_Particle Particle
+
+cdef class Py_Particle(object):
     cdef:
         public Simulation_2d sim
         public int pop_type
@@ -378,7 +391,7 @@ cdef class Particle(object):
         self.D = D
         self.k = k
 
-    cpdef void move(Particle self):
+    cpdef void move(Py_Particle self):
 
         cdef Simulation_2d sim = self.sim
 
@@ -443,6 +456,6 @@ cdef class Particle(object):
 
 
 
-    cdef Particle birth(Particle self):
+    cdef Py_Particle birth(Py_Particle self):
         return Particle(self.sim, self.pop_type, self.x, self.y, self.gridx, self.gridy,
                         D=self.D, k=self.k)
