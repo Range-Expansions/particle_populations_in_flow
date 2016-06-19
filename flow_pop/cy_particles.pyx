@@ -27,7 +27,7 @@ cdef float c_pos_mod_float(float num1, float num2) nogil:
     else:
         return num1 % num2
 
-cdef struct Particle: # Define a structure
+ctypedef struct s_Particle: # Define a structure
     int pop_type
     float x
     float y
@@ -35,6 +35,8 @@ cdef struct Particle: # Define a structure
     int gridy
     float D
     float k
+
+ctypedef s_Particle Particle
 
 cdef class Simulation_2d(object):
 
@@ -90,7 +92,7 @@ cdef class Simulation_2d(object):
 
         gsl_rng *random_generator
 
-        public vector[Particle] particle_vector
+        vector[Particle] particle_vector
 
     def __cinit__(self, unsigned long int seed = 0, **kwargs):
         self.seed = seed
@@ -171,7 +173,7 @@ cdef class Simulation_2d(object):
 
         #### Create the particle dictionary ####
         particle_id_num = 0
-        self.particle_vector = vector[Particle]
+        self.particle_vector = new vector[Particle]
 
         #### Inoculate Nutrients ####
         # Inoculate nutrient particles first. phys_N particles per deme, roughly. The carrying capacity, basically.
