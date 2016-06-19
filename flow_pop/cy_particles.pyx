@@ -27,6 +27,15 @@ cdef float c_pos_mod_float(float num1, float num2) nogil:
     else:
         return num1 % num2
 
+cdef struct Particle: # Define a structure
+    int pop_type
+    float x
+    float y
+    int gridx
+    int gridy
+    float D
+    float k
+
 cdef class Simulation_2d(object):
 
     cdef:
@@ -80,6 +89,8 @@ cdef class Simulation_2d(object):
         public int[:, :] total_growth_grid
 
         gsl_rng *random_generator
+
+        public vector[Particle] particle_vector
 
     def __cinit__(self, unsigned long int seed = 0, **kwargs):
         self.seed = seed
@@ -160,7 +171,7 @@ cdef class Simulation_2d(object):
 
         #### Create the particle dictionary ####
         particle_id_num = 0
-        particle_array = []
+        self.particle_vector = vector[Particle]
 
         #### Inoculate Nutrients ####
         # Inoculate nutrient particles first. phys_N particles per deme, roughly. The carrying capacity, basically.
@@ -181,7 +192,7 @@ cdef class Simulation_2d(object):
             new_particle = Particle(self, self.nutrient_id, cur_x, cur_y, cur_gridx, cur_gridy,
                                     D=self.dim_D_nutrient, k=0) # k is zero as nutrient decay is correleated with other growth
 
-            particle_array.append(new_particle)
+            self.particle_vector.push_back(new_particle)
 
             particle_id_num += 1
 
@@ -215,16 +226,17 @@ cdef class Simulation_2d(object):
                                     D = self.dim_Di_list[pop_type],
                                     k = self.micro_Gi_list[pop_type])
 
-            particle_array.append(new_particle)
+            self.particle_vector.push_back(new_particle)
 
             particle_id_num += 1
-
-        self.particle_array = np.array(particle_array, dtype=Py_Particle)
 
         #### Setup the grid ####
 
         self.grid = np.zeros((self.num_bins_x, self.num_bins_y, self.num_fields), dtype=np.int32)
-        for cur_particle in self.particle_dict.values():
+
+        cdef Particle cur_particle
+
+        for cur_particle in self.particle_vector:
             gridx = cur_particle.gridx
             gridy = cur_particle.gridy
 
@@ -352,17 +364,6 @@ cdef class Simulation_2d(object):
         for i in range(num_iterations):
             self.move()
             self.react()
-
-cdef struct s_Particle: # Define a structure
-    int pop_type
-    float x
-    float y
-    int gridx
-    int gridy
-    float D
-    float k
-
-ctypedef s_Particle Particle
 
 cdef class Py_Particle(object):
     cdef:
