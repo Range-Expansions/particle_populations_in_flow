@@ -378,7 +378,7 @@ cdef class Particle(object):
         self.D = D
         self.k = k
 
-    def move(self):
+    cpdef void move(Particle self):
 
         cdef Simulation_2d sim = self.sim
 
